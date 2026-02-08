@@ -1,0 +1,26 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: enforce-gateway-class
+  annotations:
+    policies.kyverno.io/title: Enforce Standard Gateway Class
+    policies.kyverno.io/category: Security
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Gateway
+    policies.kyverno.io/description: >-
+      All Gateways must use the approved 'eg' GatewayClass managed by Envoy Gateway.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: require-eg-gatewayclass
+      match:
+        any:
+          - resources:
+              kinds:
+                - Gateway
+      validate:
+        message: "Gateways must use the 'eg' GatewayClass. Found: {{ request.object.spec.gatewayClassName }}"
+        pattern:
+          spec:
+            gatewayClassName: "eg"

@@ -1,0 +1,46 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: protect-gateway-deletion
+  annotations:
+    policies.kyverno.io/title: Protect Gateway Deletion
+    policies.kyverno.io/category: Other
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Gateway
+    policies.kyverno.io/description: >-
+      Gateways must have 'approved-for-deletion' annotation to be deleted.
+spec:
+  validationFailureAction: Enforce
+  background: false
+  rules:
+    - name: require-deletion-approval
+      match:
+        any:
+          - resources:
+              kinds:
+                - Gateway
+              operations:
+                - DELETE
+      exclude:
+        any:
+          - subjects:
+              - kind: Group
+                name: system:masters
+          - subjects:
+              - kind: Group
+                name: platform-admin-team
+      preconditions:
+        all:
+          - key: "{{ request.oldObject.metadata.namespace }}"
+            operator: NotEquals
+            value: "ics-envoy-gateway"
+      validate:
+        message: >-
+          Gateway deletion requires 'approved-for-deletion: "true"' annotation.
+          Contact platform team for approval.
+        deny:
+          conditions:
+            any:
+              - key: "{{ request.oldObject.metadata.annotations.\"approved-for-deletion\" || '' }}"
+                operator: NotEquals
+                value: "true"

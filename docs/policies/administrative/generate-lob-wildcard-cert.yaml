@@ -1,0 +1,55 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: generate-lob-wildcard-cert
+  annotations:
+    policies.kyverno.io/title: Auto-Generate LOB Wildcard Certificate
+    policies.kyverno.io/category: Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Namespace, Secret
+    policies.kyverno.io/description: >-
+      Automatically creates a wildcard TLS certificate secret for each LOB namespace.
+      The secret is cloned from a template in ics-envoy-gateway namespace.
+      NOTE: Actual certificate provisioning should be handled by cert-manager or similar.
+spec:
+  generateExisting: true
+  rules:
+    - name: clone-wildcard-certificate
+      match:
+        any:
+          - resources:
+              kinds:
+                - Namespace
+              selector:
+                matchExpressions:
+                  - key: system
+                    operator: DoesNotExist
+      context:
+        - name: certificateTemplate
+          apiCall:
+            urlPath: "/api/v1/namespaces/ics-envoy-gateway/secrets/wildcard-cert-template"
+            jmesPath: "data"
+      generate:
+        apiVersion: v1
+        kind: Secret
+        name: "{{ request.object.metadata.name }}-wildcard-tls"
+        namespace: "{{ request.object.metadata.name }}"
+        synchronize: false  # Don't sync after initial creation
+        data:
+          metadata:
+            labels:
+              managed-by: kyverno
+              lob-namespace: "{{ request.object.metadata.name }}"
+              app.kubernetes.io/created-by: platform-team
+              cert-type: wildcard
+            annotations:
+              kyverno.io/generated-by: generate-lob-wildcard-cert
+              cert-hostname: "*.{{ request.object.metadata.name }}.example.com"
+              # Add annotation for cert-manager to take over
+              cert-manager.io/issuer-name: letsencrypt-prod
+              cert-manager.io/issuer-kind: ClusterIssuer
+          type: kubernetes.io/tls
+          data:
+            # These will be replaced by cert-manager
+            tls.crt: "{{ certificateTemplate.\"tls.crt\" }}"
+            tls.key: "{{ certificateTemplate.\"tls.key\" }}"

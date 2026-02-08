@@ -1,0 +1,31 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-gateway-tls
+  annotations:
+    policies.kyverno.io/title: Require TLS on HTTPS Listeners
+    policies.kyverno.io/category: Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Gateway
+    policies.kyverno.io/description: >-
+      All HTTPS listeners must have TLS configuration with certificate references.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: https-requires-tls
+      match:
+        any:
+          - resources:
+              kinds:
+                - Gateway
+      validate:
+        message: "HTTPS listeners must have TLS configuration with certificateRefs"
+        foreach:
+          - list: "request.object.spec.listeners[?protocol=='HTTPS']"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.tls.certificateRefs[] || `[]` | length(@) }}"
+                    operator: Equals
+                    value: 0

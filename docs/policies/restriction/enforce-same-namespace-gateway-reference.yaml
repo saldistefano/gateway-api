@@ -1,0 +1,38 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: enforce-same-namespace-gateway-reference
+  annotations:
+    policies.kyverno.io/title: Enforce Same-Namespace Gateway References
+    policies.kyverno.io/category: Multi-Tenancy
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: HTTPRoute, GRPCRoute
+    policies.kyverno.io/description: >-
+      HTTPRoutes and GRPCRoutes can only reference Gateways in the same namespace.
+      This provides defense-in-depth alongside Gateway allowedRoutes configuration
+      and ensures clear error messages for developers.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: require-same-namespace-gateway
+      match:
+        any:
+          - resources:
+              kinds:
+                - HTTPRoute
+                - GRPCRoute
+      validate:
+        message: >-
+          Routes can only reference Gateways in the same namespace. 
+          Found Gateway reference in namespace '{{ element.namespace }}' but route is in '{{ request.namespace }}'.
+          Each LOB namespace has its own auto-generated gateway: '{{ request.namespace }}-gateway'.
+        foreach:
+          - list: "request.object.spec.parentRefs[]"
+            deny:
+              conditions:
+                all:
+                  # If namespace is specified in parentRef, it must match route namespace
+                  - key: "{{ element.namespace || request.namespace }}"
+                    operator: NotEquals
+                    value: "{{ request.namespace }}"

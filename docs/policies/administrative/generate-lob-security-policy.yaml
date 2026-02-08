@@ -1,0 +1,62 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: generate-lob-security-policy
+  annotations:
+    policies.kyverno.io/title: Auto-Generate LOB Security Policy
+    policies.kyverno.io/category: Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Namespace, SecurityPolicy
+    policies.kyverno.io/description: >-
+      Automatically creates a SecurityPolicy for each LOB gateway with default security settings.
+spec:
+  generateExisting: true
+  rules:
+    - name: create-security-policy
+      match:
+        any:
+          - resources:
+              kinds:
+                - Namespace
+              selector:
+                matchExpressions:
+                  - key: system
+                    operator: DoesNotExist
+      generate:
+        apiVersion: gateway.envoyproxy.io/v1alpha1
+        kind: SecurityPolicy
+        name: "{{ request.object.metadata.name }}-security"
+        namespace: "{{ request.object.metadata.name }}"
+        synchronize: true
+        data:
+          metadata:
+            labels:
+              managed-by: kyverno
+              lob-namespace: "{{ request.object.metadata.name }}"
+              app.kubernetes.io/created-by: platform-team
+            annotations:
+              kyverno.io/generated-by: generate-lob-security-policy
+          spec:
+            targetRef:
+              group: gateway.networking.k8s.io
+              kind: Gateway
+              name: "{{ request.object.metadata.name }}-gateway"
+            tls:
+              minVersion: "1.3"
+              ciphers:
+                - TLS_AES_128_GCM_SHA256
+                - TLS_AES_256_GCM_SHA384
+                - TLS_CHACHA20_POLY1305_SHA256
+            cors:
+              allowOrigins:
+                - "https://*.{{ request.object.metadata.name }}.example.com"
+              allowMethods:
+                - GET
+                - POST
+                - PUT
+                - PATCH
+                - DELETE
+                - OPTIONS
+              allowHeaders:
+                - "*"
+              maxAge: 24h

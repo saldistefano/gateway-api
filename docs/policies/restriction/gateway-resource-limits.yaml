@@ -1,0 +1,29 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: gateway-resource-limits
+  annotations:
+    policies.kyverno.io/title: Gateway Resource Quota
+    policies.kyverno.io/category: Multi-Tenancy
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Gateway
+    policies.kyverno.io/description: >-
+      Limit the number of listeners and routes per gateway to prevent resource exhaustion.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: limit-listeners
+      match:
+        any:
+          - resources:
+              kinds:
+                - Gateway
+      validate:
+        message: "Gateways are limited to 4 listeners maximum"
+        deny:
+          conditions:
+            any:
+              - key: "{{ request.object.spec.listeners | length(@) }}"
+                operator: GreaterThan
+                value: 4

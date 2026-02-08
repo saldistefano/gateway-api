@@ -1,0 +1,50 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-gateway-creation
+  annotations:
+    policies.kyverno.io/title: Restrict Gateway Creation
+    policies.kyverno.io/category: Multi-Tenancy
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Gateway
+    policies.kyverno.io/description: >-
+      Only allow Gateways to be created in approved namespaces by platform team.
+      LOB teams must go through approval process for additional gateways.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: restrict-gateway-namespace
+      match:
+        any:
+          - resources:
+              kinds:
+                - Gateway
+      exclude:
+        any:
+          - subjects:
+              - kind: ServiceAccount
+                name: kyverno-admin  # Exclude Kyverno admin for auto-generation
+                namespace: kyverno
+          - subjects:
+              - kind: Group
+                name: system:masters
+          - subjects:
+              - kind: Group
+                name: platform-admin-team
+      validate:
+        message: >-
+          Gateways can only be created in the ics-envoy-gateway namespace or 
+          LOB-specific namespaces by the platform team. Submit a gateway request 
+          through the approved process for additional gateways.
+        deny:
+          conditions:
+            all:
+              - key: "{{ request.namespace }}"
+                operator: NotIn
+                value: 
+                  - ics-envoy-gateway
+                  # LOB namespaces will be auto-created with gateways
+              - key: "{{ request.operation }}"
+                operator: In
+                value: ["CREATE", "UPDATE"]
