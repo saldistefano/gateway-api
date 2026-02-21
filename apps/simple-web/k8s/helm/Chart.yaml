@@ -1,0 +1,7 @@
+apiVersion: v2
+name: simple-web
+description: SvelteKit web application for learning Envoy Gateway on Kubernetes
+
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

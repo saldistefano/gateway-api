@@ -1,0 +1,7 @@
+apiVersion: v2
+name: simple-api
+description: DummyJSON API - Generate placeholder data on the fly for development and testing
+
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
